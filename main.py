@@ -105,11 +105,11 @@ def main():
     app.add_handler(CallbackQueryHandler(callback_handler))
 
     # ── Message handler — admin messages handled first ──
+    
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.User(user_id=list(range(10**9))),
+        filters.TEXT & ~filters.COMMAND,
         _combined_message_handler
     ))
-
     # ── Error handler ──
     app.add_error_handler(error_handler)
 
