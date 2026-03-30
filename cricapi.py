@@ -5,14 +5,17 @@ from config import CRICAPI_KEY, CRICAPI_BASE
 
 logger = logging.getLogger(__name__)
 
-# All known IPL-related keywords in CricAPI match names
-IPL_KEYWORDS = [
-    "ipl", "indian premier league",
-    "mi ", "csk", "rcb", "kkr", "srh", "dc ", "rr ", "pbks", "lsg", "gt ",
-    "mumbai indians", "chennai super kings", "royal challengers",
-    "kolkata knight riders", "sunrisers hyderabad", "delhi capitals",
-    "rajasthan royals", "punjab kings", "lucknow super giants", "gujarat titans",
-]
+# STRICT IPL team names — must match exactly as full words
+# PSL teams (Peshawar, Lahore, Karachi etc.) are NOT here
+IPL_TEAMS = {
+    "mumbai indians", "chennai super kings", "royal challengers bengaluru",
+    "royal challengers bangalore", "kolkata knight riders",
+    "sunrisers hyderabad", "delhi capitals", "rajasthan royals",
+    "punjab kings", "lucknow super giants", "gujarat titans",
+}
+
+# Short codes only valid when paired with IPL series name
+IPL_SHORT = {"mi", "csk", "rcb", "kkr", "srh", "dc", "rr", "pbks", "lsg", "gt"}
 
 
 async def _get(endpoint, params):
@@ -30,13 +33,11 @@ async def _get(endpoint, params):
 
 
 async def fetch_current_matches():
-    """All live/recent matches."""
     data = await _get("currentMatches", {"offset": 0})
     return [_normalise(m) for m in data.get("data", []) if m.get("id")]
 
 
 async def fetch_upcoming_matches():
-    """Upcoming scheduled matches."""
     data = await _get("matches", {"offset": 0})
     result = []
     for m in data.get("data", []):
@@ -47,13 +48,29 @@ async def fetch_upcoming_matches():
 
 async def fetch_match_detail(api_id):
     data = await _get("match_info", {"id": api_id})
-    raw = data.get("data", {})
+    raw  = data.get("data", {})
     return _normalise(raw) if raw else {}
 
 
-def _is_ipl(name: str) -> bool:
+def _is_ipl(name: str, teams: list) -> bool:
+    """
+    Strict IPL detection:
+    - Match name must explicitly contain 'ipl' or 'indian premier league'
+    - OR both teams must be known IPL franchises by full name
+    """
     name_lower = name.lower()
-    return any(k in name_lower for k in IPL_KEYWORDS)
+
+    # Most reliable: name contains ipl or indian premier league
+    if "ipl" in name_lower or "indian premier league" in name_lower:
+        return True
+
+    # Both teams are known IPL franchises (full name match)
+    teams_lower = [t.lower().strip() for t in teams]
+    if len(teams_lower) >= 2:
+        if teams_lower[0] in IPL_TEAMS and teams_lower[1] in IPL_TEAMS:
+            return True
+
+    return False
 
 
 def _normalise(m: dict) -> dict:
@@ -64,8 +81,7 @@ def _normalise(m: dict) -> dict:
     teams = m.get("teams", [])
     team1 = teams[0] if len(teams) > 0 else m.get("team1", "TBA")
     team2 = teams[1] if len(teams) > 1 else m.get("team2", "TBA")
-
-    name     = m.get("name", f"{team1} vs {team2}")
+    name  = m.get("name", f"{team1} vs {team2}")
     date_str = m.get("dateTimeGMT") or m.get("date") or ""
 
     return {
@@ -79,7 +95,7 @@ def _normalise(m: dict) -> dict:
         "start_display": _fmt_time(date_str),
         "status":        status,
         "score":         _fmt_score(m.get("score", [])),
-        "is_ipl":        1 if _is_ipl(name) else 0,
+        "is_ipl":        1 if _is_ipl(name, teams) else 0,
     }
 
 
@@ -92,12 +108,10 @@ def _fmt_score(scores: list) -> str:
         r = s.get("r", 0)
         w = s.get("w", 0)
         o = s.get("o", 0)
-        # Shorten inning name: "Mumbai Indians Inning 1" → "MI"
         short = inning.split(" Inning")[0].split(" innings")[0]
-        # Further shorten long names
         if len(short) > 20:
             words = short.split()
-            short = "".join(w[0] for w in words if w)  # initials
+            short = "".join(w[0] for w in words if w)
         parts.append(f"{short}: {r}/{w} ({o}ov)")
     return "   |   ".join(parts)
 
