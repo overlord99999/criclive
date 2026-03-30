@@ -32,7 +32,7 @@ STRINGS = {
 
         # Menu buttons
         "btn_live":     "🔴 Live Matches",
-        "btn_ipl":      "🏆 IPL 2025",
+        "btn_ipl":      "🏆 IPL 2026",
         "btn_other":    "🌍 Other Cricket",
         "btn_schedule": "📅 Schedule",
         "btn_reminder": "🔔 My Reminders",
