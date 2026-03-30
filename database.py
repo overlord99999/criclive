@@ -162,9 +162,11 @@ def get_live_matches():
 
 
 def get_ipl_matches():
+    """IPL only — live first, then upcoming. Never show ended."""
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM matches WHERE is_ipl=1 ORDER BY status DESC, start_time ASC"
+        "SELECT * FROM matches WHERE is_ipl=1 AND status != 'ended' "
+        "ORDER BY CASE status WHEN 'live' THEN 0 WHEN 'upcoming' THEN 1 END, start_time ASC"
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -180,9 +182,11 @@ def get_upcoming_matches():
 
 
 def get_other_matches():
+    """Non-IPL — live first, then upcoming. Never show ended."""
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM matches WHERE is_ipl=0 ORDER BY status DESC, start_time ASC LIMIT 12"
+        "SELECT * FROM matches WHERE is_ipl=0 AND status != 'ended' "
+        "ORDER BY CASE status WHEN 'live' THEN 0 WHEN 'upcoming' THEN 1 END, start_time ASC LIMIT 15"
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
